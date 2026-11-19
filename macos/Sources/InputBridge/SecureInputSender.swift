@@ -32,7 +32,7 @@ public final class SecureInputSender {
                 self.state = .ready
                 self.monitorPeerClosure()
                 onReady()
-            case .failed(let error): self.close(error)
+            case .waiting(let error), .failed(let error): self.close(error)
             case .cancelled: self.close(nil)
             default: break
             }
