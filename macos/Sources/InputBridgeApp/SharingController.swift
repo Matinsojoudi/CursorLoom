@@ -6,6 +6,8 @@ import Security
 /// Network identity and peer pin are chosen manually and never persisted.
 final class SharingController: ObservableObject {
     @Published private(set) var status = "Stopped"
+    @Published private(set) var connected = false
+    @Published private(set) var sharing = false
     private var sender: SecureInputSender?
     private var capture: MacInputCapture?
     private var session: InputSession?
@@ -18,6 +20,8 @@ final class SharingController: ObservableObject {
         let connection = try SecureTransport.client(host: host, port: port, fingerprint: pin,
                                                     identity: identity, callbackQueue: .main)
         let newSender = SecureInputSender(connection: connection, queue: .main) { [weak self] error in
+            self?.connected = false
+            self?.sharing = false
             self?.session?.disconnect()
             self?.capture?.stop()
             self?.capture = nil
@@ -34,7 +38,7 @@ final class SharingController: ObservableObject {
         session = newSession
         status = "Connecting…"
         newSender.start { [weak self, weak newSession] in
-            do { try newSession?.authenticated(); self?.status = "Connected — sharing off" }
+            do { try newSession?.authenticated(); self?.connected = true; self?.status = "Connected — sharing off" }
             catch { self?.stop(); self?.status = "Session error" }
         }
     }
@@ -45,15 +49,17 @@ final class SharingController: ObservableObject {
         try session.beginSharing(consent: true, clipboard: false)
         let capture = MacInputCapture { [weak self] event in
             guard let self else { return }
-            do { try self.session?.forward(event) }
-            catch { self.stop(); self.status = "Input sharing stopped" }
+            do {
+                try self.session?.forward(event)
+                if case .releaseAll = event { self.stopSharing(); self.status = "Capture stopped by macOS" }
+            } catch { self.stop(); self.status = "Input sharing stopped" }
         }
         self.capture = capture
-        do { try capture.start(); status = "Sharing input — local input remains active" }
+        do { try capture.start(); sharing = true; status = "Sharing input — local input remains active" }
         catch { session.stopSharing(); self.capture = nil; throw error }
     }
 
-    func stopSharing() { session?.stopSharing(); status = "Connected — sharing off" }
+    func stopSharing() { session?.stopSharing(); sharing = false; status = connected ? "Connected — sharing off" : "Stopped" }
 
     func stop() {
         precondition(Thread.isMainThread)
@@ -62,6 +68,8 @@ final class SharingController: ObservableObject {
         session = nil
         capture = nil
         sender = nil
+        connected = false
+        sharing = false
         status = "Stopped"
     }
 
