@@ -67,7 +67,10 @@ struct ContentView: View {
         } message: {
             Text("Local input will also remain active. Do not type passwords while sharing. You can stop using the Stop sharing button.")
         }
-        .onDisappear { controller.stop() }
+        .onDisappear { controller.stop(); shareClipboard = false; password = "" }
+        .onChange(of: controller.connected) { connected in
+            if !connected { shareClipboard = false }
+        }
     }
 
     private func chooseCertificate() {

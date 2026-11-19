@@ -92,13 +92,15 @@ internal sealed class MainWindow : Form
             status.Text = "Peer disconnected";
         }
         catch (OperationCanceledException) { status.Text = "Stopped"; }
-        catch (Exception error) when (error is IOException or CryptographicException or ArgumentException or InvalidOperationException or System.Net.Sockets.SocketException or System.Security.Authentication.AuthenticationException or UnauthorizedAccessException)
+        catch (Exception error) when (error is IOException or CryptographicException or ArgumentException or FormatException or InvalidOperationException or System.Net.Sockets.SocketException or System.Security.Authentication.AuthenticationException or UnauthorizedAccessException)
         { status.Text = "Stopped: " + error.Message; }
         finally
         {
             listener?.Dispose(); listener = null;
             cancellation = null; cts?.Dispose(); certificate?.Dispose(); password.Clear();
             allowClipboard.Enabled = true;
+            consent.Checked = false;
+            allowClipboard.Checked = false;
             start.Enabled = true; stop.Enabled = false;
             if (closeWhenStopped) Close();
         }
