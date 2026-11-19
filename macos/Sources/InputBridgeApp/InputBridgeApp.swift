@@ -19,11 +19,12 @@ struct ContentView: View {
     @State private var fingerprint = ""
     @State private var errorMessage = ""
     @State private var showConsent = false
+    @State private var shareClipboard = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("CursorLoom — experimental sender").font(.title2.bold())
-            Text("One-way test only. Local input remains active while sharing. Clipboard is disabled.")
+            Text("One-way test only. Local input remains active while sharing. Clipboard is opt-in on both devices.")
                 .foregroundStyle(.secondary)
             Form {
                 TextField("Windows IP or hostname", text: $host)
@@ -35,6 +36,7 @@ struct ContentView: View {
                 SecureField("Identity password", text: $password)
                 TextField("Windows certificate SHA-256 fingerprint", text: $fingerprint)
             }
+            Toggle("Also send clipboard text (may contain sensitive data)", isOn: $shareClipboard).disabled(controller.sharing)
             HStack {
                 Button("Connect") { connect() }.disabled(controller.connected)
                 Button("Disconnect") { controller.stop() }
@@ -58,7 +60,7 @@ struct ContentView: View {
         .padding(20)
         .confirmationDialog("Share all keyboard and mouse activity with the connected Windows computer?", isPresented: $showConsent) {
             Button("Start sharing") {
-                do { try controller.startSharing(); errorMessage = "" }
+                do { try controller.startSharing(shareClipboard: shareClipboard); errorMessage = "" }
                 catch { errorMessage = "Cannot start capture: \(error.localizedDescription)" }
             }
             Button("Cancel", role: .cancel) { }

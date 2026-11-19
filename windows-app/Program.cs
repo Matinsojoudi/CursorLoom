@@ -21,6 +21,7 @@ internal sealed class MainWindow : Form
     private readonly TextBox peerPin = new() { Width = 420 };
     private readonly NumericUpDown port = new() { Minimum = 1, Maximum = 65535, Value = 24800 };
     private readonly CheckBox consent = new() { Text = "Allow this pinned device to control this computer", AutoSize = true };
+    private readonly CheckBox allowClipboard = new() { Text = "Allow incoming clipboard text to replace local clipboard", AutoSize = true };
     private readonly Button start = new() { Text = "Start receiver", AutoSize = true };
     private readonly Button stop = new() { Text = "Stop", AutoSize = true, Enabled = false };
     private readonly Label status = new() { Text = "Stopped", AutoSize = true };
@@ -37,7 +38,7 @@ internal sealed class MainWindow : Form
         var panel = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown,
             Padding = new Padding(18), WrapContents = false, AutoScroll = true };
         panel.Controls.Add(new Label { Text = "Experimental receiver — one-way only", AutoSize = true, Font = new Font(Font.FontFamily, 15, FontStyle.Bold) });
-        panel.Controls.Add(new Label { Text = "Only use on a trusted test network. Clipboard is disabled.", AutoSize = true });
+        panel.Controls.Add(new Label { Text = "Only use on a trusted test network. Clipboard is optional.", AutoSize = true });
         panel.Controls.Add(new Label { Text = "Local PKCS#12 certificate (.p12 / .pfx):", AutoSize = true });
         var pathRow = new FlowLayoutPanel { AutoSize = true };
         var browse = new Button { Text = "Browse…", AutoSize = true };
@@ -47,6 +48,7 @@ internal sealed class MainWindow : Form
         panel.Controls.Add(new Label { Text = "Peer certificate SHA-256 fingerprint (verify out-of-band):", AutoSize = true }); panel.Controls.Add(peerPin);
         panel.Controls.Add(new Label { Text = "TCP port:", AutoSize = true }); panel.Controls.Add(port);
         panel.Controls.Add(consent);
+        panel.Controls.Add(allowClipboard);
         var row = new FlowLayoutPanel { AutoSize = true }; row.Controls.Add(start); row.Controls.Add(stop); panel.Controls.Add(row);
         panel.Controls.Add(status); Controls.Add(panel);
         start.Click += async (_, _) => await RunReceiverAsync();
@@ -77,12 +79,14 @@ internal sealed class MainWindow : Form
             listener.Start();
             cts = new CancellationTokenSource();
             cancellation = cts;
+            bool clipboardAllowed = allowClipboard.Checked;
+            allowClipboard.Enabled = false;
             start.Enabled = false; stop.Enabled = true;
             status.Text = "Waiting for authenticated peer…";
             using var stream = await listener.AcceptAsync(cts.Token);
             listener.Dispose(); listener = null;
             status.Text = "Connected — remote input enabled. Press Stop to disconnect.";
-            await SecureInputReceiver.RunAsync(stream, DispatchToUI, false, cts.Token);
+            await SecureInputReceiver.RunAsync(stream, DispatchToUI, clipboardAllowed, cts.Token);
             status.Text = "Peer disconnected";
         }
         catch (OperationCanceledException) { status.Text = "Stopped"; }
@@ -92,6 +96,7 @@ internal sealed class MainWindow : Form
         {
             listener?.Dispose(); listener = null;
             cancellation = null; cts?.Dispose(); certificate?.Dispose(); password.Clear();
+            allowClipboard.Enabled = true;
             start.Enabled = true; stop.Enabled = false;
             if (closeWhenStopped) Close();
         }

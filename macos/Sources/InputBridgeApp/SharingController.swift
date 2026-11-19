@@ -11,6 +11,8 @@ final class SharingController: ObservableObject {
     private var sender: SecureInputSender?
     private var capture: MacInputCapture?
     private var session: InputSession?
+    private var clipboard: ClipboardMonitor?
+    private var clipboardTimer: Timer?
 
     func connect(host: String, port: UInt16, certificate: Data, password: String, peerFingerprint: String) throws {
         precondition(Thread.isMainThread)
@@ -20,6 +22,7 @@ final class SharingController: ObservableObject {
         let connection = try SecureTransport.client(host: host, port: port, fingerprint: pin,
                                                     identity: identity, callbackQueue: .main)
         let newSender = SecureInputSender(connection: connection, queue: .main) { [weak self] error in
+            self?.stopClipboard()
             self?.connected = false
             self?.sharing = false
             self?.session?.disconnect()
@@ -43,10 +46,10 @@ final class SharingController: ObservableObject {
         }
     }
 
-    func startSharing() throws {
+    func startSharing(shareClipboard: Bool) throws {
         precondition(Thread.isMainThread)
         guard let session, session.state.phase == .connected else { throw ControllerError.notConnected }
-        try session.beginSharing(consent: true, clipboard: false)
+        try session.beginSharing(consent: true, clipboard: shareClipboard)
         let capture = MacInputCapture { [weak self] event in
             guard let self else { return }
             do {
@@ -55,14 +58,39 @@ final class SharingController: ObservableObject {
             } catch { self.stop(); self.status = "Input sharing stopped" }
         }
         self.capture = capture
-        do { try capture.start(); sharing = true; status = "Sharing input — local input remains active" }
-        catch { session.stopSharing(); self.capture = nil; throw error }
+        do {
+            try capture.start()
+            if shareClipboard {
+                let monitor = ClipboardMonitor { [weak self] text in
+                    do { try self?.session?.forward(.clipboard(text: text)) }
+                    catch { self?.stop(); self?.status = "Clipboard sharing stopped" }
+                }
+                clipboard = monitor
+                clipboardTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+                    self?.clipboard?.poll()
+                }
+            }
+            sharing = true
+            status = "Sharing input — local input remains active"
+        } catch { session.stopSharing(); self.capture = nil; stopClipboard(); throw error }
     }
 
-    func stopSharing() { session?.stopSharing(); sharing = false; status = connected ? "Connected — sharing off" : "Stopped" }
+    private func stopClipboard() {
+        clipboardTimer?.invalidate()
+        clipboardTimer = nil
+        clipboard = nil
+    }
+
+    func stopSharing() {
+        stopClipboard()
+        session?.stopSharing()
+        sharing = false
+        status = connected ? "Connected — sharing off" : "Stopped"
+    }
 
     func stop() {
         precondition(Thread.isMainThread)
+        stopClipboard()
         session?.stopSharing()
         sender?.stop()
         session = nil
