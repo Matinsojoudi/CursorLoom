@@ -29,6 +29,8 @@ internal sealed class SecureListener : IDisposable
 
     public void Start() => listener.Start(1);
 
+    internal int LocalPort => ((IPEndPoint)listener.LocalEndpoint).Port;
+
     public async Task<SslStream> AcceptAsync(CancellationToken cancellationToken)
     {
         TcpClient client = await listener.AcceptTcpClientAsync(cancellationToken).ConfigureAwait(false);

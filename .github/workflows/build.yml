@@ -22,5 +22,7 @@ jobs:
           dotnet-version: 8.0.x
       - name: Test Windows protocol
         run: dotnet run --project windows-tests/InputBridge.Protocol.Tests.csproj --configuration Release
+      - name: Test Windows TLS listener
+        run: dotnet run --project windows-integration/InputBridge.Tls.Tests.csproj --configuration Release
       - name: Build Windows preview
         run: dotnet build windows-app/InputBridge.Windows.csproj --configuration Release
