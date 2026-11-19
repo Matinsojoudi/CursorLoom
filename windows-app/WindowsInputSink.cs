@@ -31,6 +31,13 @@ internal sealed class WindowsInputSink
         [226]=0x38,[227]=0x15b,[228]=0x11d,[229]=0x36,[230]=0x138,[231]=0x15c
     };
 
+    internal static int? UsageForScanCode(int scan)
+    {
+        foreach (var pair in ScanCodes)
+            if (pair.Value == scan) return pair.Key;
+        return null;
+    }
+
     public bool Apply(RemoteInput input, bool allowClipboard = false)
     {
         switch (input)
