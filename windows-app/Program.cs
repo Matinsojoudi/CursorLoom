@@ -73,7 +73,9 @@ internal sealed class MainWindow : Form
             string normalizedPin = new string(peerPin.Text.Where(c => c != ':' && !char.IsWhiteSpace(c)).ToArray());
             byte[] pin = Convert.FromHexString(normalizedPin);
             if (pin.Length != 32) throw new ArgumentException("Fingerprint must contain 32 bytes.");
-            certificate = new X509Certificate2(certificatePath.Text, password.Text, X509KeyStorageFlags.EphemeralKeySet);
+            // Windows Schannel cannot use EphemeralKeySet for server TLS credentials.
+            // UserKeySet imports a temporary user-profile key; disposing the certificate removes it.
+            certificate = new X509Certificate2(certificatePath.Text, password.Text, X509KeyStorageFlags.UserKeySet);
             password.Clear();
             listener = new SecureListener(IPAddress.Any, (int)port.Value, certificate, pin);
             listener.Start();

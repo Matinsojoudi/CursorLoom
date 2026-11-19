@@ -13,7 +13,8 @@ static X509Certificate2 CreateIdentity(string name, string usage)
     var usages = new OidCollection { new Oid(usage) };
     request.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension(usages, true));
     request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature, true));
-    return request.CreateSelfSigned(DateTimeOffset.UtcNow.AddMinutes(-5), DateTimeOffset.UtcNow.AddHours(1));
+    using X509Certificate2 generated = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddMinutes(-5), DateTimeOffset.UtcNow.AddHours(1));
+    return new X509Certificate2(generated.Export(X509ContentType.Pkcs12), (string?)null, X509KeyStorageFlags.UserKeySet);
 }
 
 static async Task CheckAsync(bool validClient, CancellationToken timeout)
