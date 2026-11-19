@@ -57,7 +57,24 @@ final class TLSTests: XCTestCase {
         server.standardError = FileHandle.nullDevice
         try server.run()
         defer { if server.isRunning { server.terminate(); server.waitUntilExit() } }
-        // Server startup races are avoided by retrying separate connections below.
+        // Wait until the server accepts TCP connections before starting TLS.
+        let started = expectation(description: "OpenSSL server ready")
+        let deadline = Date().addingTimeInterval(5)
+        func checkReady() {
+            let probe = NWConnection(host: "127.0.0.1", port: NWEndpoint.Port(rawValue: port) ?? .https, using: .tcp)
+            probe.stateUpdateHandler = { state in
+                switch state {
+                case .ready: probe.cancel(); started.fulfill()
+                case .waiting, .failed:
+                    probe.cancel()
+                    if Date() < deadline { queue.asyncAfter(deadline: .now() + 0.1) { checkReady() } }
+                default: break
+                }
+            }
+            probe.start(queue: queue)
+        }
+        checkReady()
+        wait(for: [started], timeout: 6)
         func attempt(pin: Data, shouldSucceed: Bool) throws {
             let finished = expectation(description: shouldSucceed ? "trusted" : "rejected")
             let connection = try SecureTransport.client(host: "127.0.0.1", port: port, fingerprint: pin,
