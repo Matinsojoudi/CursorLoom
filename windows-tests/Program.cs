@@ -43,4 +43,11 @@ Assert(session.Permits(new KeyInput(4, true)), "Sharing should allow key");
 Assert(!session.Permits(new ClipboardInput("secret")), "Clipboard requires consent");
 session.Disconnect();
 Assert(!session.Permits(new KeyInput(4, true)), "Disconnected state must deny input");
+byte[] shared = File.ReadAllBytes(Path.Combine("test-vectors", "input-messages.jsonl"));
+var fixtureDecoder = new FrameDecoder();
+RemoteInput[] fixture = fixtureDecoder.Append(shared).Select(InputValidator.Parse).ToArray();
+fixtureDecoder.Finish();
+RemoteInput[] expected = { new KeyInput(4, true), new PointerInput(0.25, 0.75), new ButtonInput(1, false),
+    new ScrollInput(-3, 1), new ClipboardInput("سلام 🌍\nline"), new ReleaseAllInput() };
+Assert(fixture.SequenceEqual(expected), "Shared protocol fixtures differ");
 Console.WriteLine("Protocol and session checks passed.");

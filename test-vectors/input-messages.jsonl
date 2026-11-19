@@ -1,0 +1,6 @@
+{"version":1,"type":"key","payload":{"usage":4,"down":true}}
+{"version":1,"type":"pointer","payload":{"x":0.25,"y":0.75}}
+{"version":1,"type":"button","payload":{"index":1,"down":false}}
+{"version":1,"type":"scroll","payload":{"vertical":-3,"horizontal":1}}
+{"version":1,"type":"clipboard","payload":{"text":"سلام 🌍\nline"}}
+{"version":1,"type":"releaseAll","payload":{}}
