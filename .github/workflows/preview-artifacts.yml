@@ -1,0 +1,43 @@
+name: Preview artifacts
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test and build experimental macOS binary
+        working-directory: macos
+        run: |
+          CURSORLOOM_TLS_INTEGRATION=1 swift test -Xswiftc -warnings-as-errors
+          swift build -c release -Xswiftc -warnings-as-errors
+          mkdir -p ../preview-macos
+          cp "$(swift build -c release --show-bin-path)/InputBridgeApp" ../preview-macos/
+          printf 'EXPERIMENTAL PREVIEW ONLY. Not a complete Synergy replacement. Unsigned executable; not a packaged .app.\n' > ../preview-macos/README.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CursorLoom-macOS-experimental
+          path: preview-macos/
+          if-no-files-found: error
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Run tests
+        run: |
+          dotnet run --project windows-tests/InputBridge.Protocol.Tests.csproj --configuration Release
+          dotnet run --project windows-integration/InputBridge.Tls.Tests.csproj --configuration Release
+      - name: Publish experimental Windows receiver
+        run: |
+          dotnet publish windows-app/InputBridge.Windows.csproj -c Release -r win-x64 --self-contained false -o preview-windows
+          'EXPERIMENTAL PREVIEW ONLY. Requires .NET 8 Desktop Runtime. Not a complete Synergy replacement.' | Out-File preview-windows/README.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CursorLoom-Windows-x64-experimental
+          path: preview-windows/
+          if-no-files-found: error
