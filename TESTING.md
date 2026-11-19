@@ -16,6 +16,6 @@ This is an experimental test, not production guidance. Use dedicated test accoun
 3. Test primary-display movement, left/right click, common key positions and scroll. Confirm local input is also active. Do not test secrets. Current implementation has no screen-edge switching and supports only a subset of keys.
 4. Stop sharing, disconnect, reconnect, then disconnect abruptly while a key and a mouse button are held. Verify both are released on Windows. Repeat for app termination and network interruption.
 5. Test wrong pins, missing client identity, invalid port and missing permissions: each must fail closed. Test legitimate pin on both ends. Observe UI and process logs; no sensitive data should be logged.
-6. Test with clipboard disabled and verify no clipboard transfer occurs. Clipboard support remains unfinished.
+6. Test clipboard with either endpoint disabled and confirm no clipboard transfer occurs (the receiver may close the session upon rejecting an unexpected clipboard message). Enable clipboard on both ends and test ordinary text copied on macOS reaches Windows. Only changes after capture begins are sent. Verify stopping sharing stops further updates. Reverse clipboard synchronization is not implemented.
 
 Record OS versions, commit SHA, results, errors, and which tests were actually performed. Never mark this plan passed without real observations. Automated Swift tests and Windows CI compilation do not substitute for these steps.
