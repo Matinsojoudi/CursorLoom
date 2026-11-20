@@ -16,15 +16,21 @@ internal sealed class SecureListener : IDisposable
 {
     private readonly TcpListener listener;
     private readonly X509Certificate2 certificate;
-    private readonly byte[] peerPin;
+    private readonly byte[]? peerPin;
+    public byte[]? LastPeerFingerprint { get; private set; }
 
-    public SecureListener(IPAddress address, int port, X509Certificate2 certificate, byte[] peerPin)
+    /// <summary>Pairing mode: accepts any client certificate and gates access on the
+    /// user's consent prompt. LastPeerFingerprint records what was seen.</summary>
+    public SecureListener(IPAddress address, int port, X509Certificate2 certificate)
+        : this(address, port, certificate, null) { }
+
+    public SecureListener(IPAddress address, int port, X509Certificate2 certificate, byte[]? peerPin)
     {
-        if (peerPin.Length != 32) throw new ArgumentException("Expected SHA-256 certificate pin", nameof(peerPin));
+        if (peerPin is not null && peerPin.Length != 32) throw new ArgumentException("Expected SHA-256 certificate pin", nameof(peerPin));
         if (!certificate.HasPrivateKey) throw new ArgumentException("Server certificate requires a private key", nameof(certificate));
         listener = new TcpListener(address, port);
         this.certificate = certificate;
-        this.peerPin = (byte[])peerPin.Clone();
+        this.peerPin = peerPin is null ? null : (byte[])peerPin.Clone();
     }
 
     public void Start() => listener.Start(1);
@@ -37,7 +43,12 @@ internal sealed class SecureListener : IDisposable
         client.NoDelay = true;
         var stream = new SslStream(client.GetStream(), leaveInnerStreamOpen: false,
             userCertificateValidationCallback: (_, peer, _, _) =>
-                peer is not null && CryptographicOperations.FixedTimeEquals(SHA256.HashData(peer.GetRawCertData()), peerPin));
+            {
+                if (peer is null) return false;
+                byte[] observed = SHA256.HashData(peer.GetRawCertData());
+                LastPeerFingerprint = observed;
+                return peerPin is null || CryptographicOperations.FixedTimeEquals(observed, peerPin);
+            });
         try
         {
             var options = new SslServerAuthenticationOptions
