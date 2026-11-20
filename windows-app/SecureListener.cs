@@ -47,7 +47,9 @@ internal sealed class SecureListener : IDisposable
                 EnabledSslProtocols = SslProtocols.Tls13,
                 CertificateRevocationCheckMode = X509RevocationMode.NoCheck
             };
-            await stream.AuthenticateAsServerAsync(options, cancellationToken).ConfigureAwait(false);
+            using var handshakeTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            handshakeTimeout.CancelAfter(TimeSpan.FromSeconds(10));
+            await stream.AuthenticateAsServerAsync(options, handshakeTimeout.Token).ConfigureAwait(false);
             return stream;
         }
         catch

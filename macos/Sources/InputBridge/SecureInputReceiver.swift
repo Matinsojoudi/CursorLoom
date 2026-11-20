@@ -5,7 +5,7 @@ import Network
 /// All calls and callbacks run on the supplied serial queue. It never starts itself;
 /// the owner must obtain explicit user consent and dispatch UI operations safely.
 public final class SecureInputReceiver {
-    public enum ReceiverError: Error { case rejectedInput }
+    public enum ReceiverError: Error { case rejectedInput, handshakeTimeout }
     private let connection: NWConnection
     private let queue: DispatchQueue
     private let apply: (RemoteInput) -> Bool
@@ -14,6 +14,7 @@ public final class SecureInputReceiver {
     private var decoder = FrameDecoder()
     private var closed = false
     private var started = false
+    private var handshakeDeadline: DispatchWorkItem?
 
     public init(connection: NWConnection, queue: DispatchQueue,
                 apply: @escaping (RemoteInput) -> Bool,
@@ -32,12 +33,18 @@ public final class SecureInputReceiver {
         connection.stateUpdateHandler = { [weak self] state in
             guard let self else { return }
             switch state {
-            case .ready: self.receive()
+            case .ready:
+                self.handshakeDeadline?.cancel()
+                self.handshakeDeadline = nil
+                self.receive()
             case .waiting(let error), .failed(let error): self.close(error)
             case .cancelled: self.close(nil)
             default: break
             }
         }
+        let deadline = DispatchWorkItem { [weak self] in self?.close(ReceiverError.handshakeTimeout) }
+        handshakeDeadline = deadline
+        queue.asyncAfter(deadline: .now() + 10, execute: deadline)
         connection.start(queue: queue)
     }
 
@@ -65,6 +72,8 @@ public final class SecureInputReceiver {
     private func close(_ error: Error?) {
         guard !closed else { return }
         closed = true
+        handshakeDeadline?.cancel()
+        handshakeDeadline = nil
         connection.cancel()
         release()
         finished(error)

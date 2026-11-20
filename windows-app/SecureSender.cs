@@ -34,8 +34,10 @@ internal sealed class SecureSender : IAsyncDisposable
         SslStream? stream = null;
         try
         {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(TimeSpan.FromSeconds(10));
             client.NoDelay = true;
-            await client.ConnectAsync(host, port, cancellationToken).ConfigureAwait(false);
+            await client.ConnectAsync(host, port, timeout.Token).ConfigureAwait(false);
             stream = new SslStream(client.GetStream(), leaveInnerStreamOpen: false,
                 (_, peer, _, _) => peer is not null && CryptographicOperations.FixedTimeEquals(
                     SHA256.HashData(peer.GetRawCertData()), expectedPin));
@@ -45,7 +47,7 @@ internal sealed class SecureSender : IAsyncDisposable
                 ClientCertificates = new X509CertificateCollection { identity },
                 EnabledSslProtocols = SslProtocols.Tls13,
                 CertificateRevocationCheckMode = X509RevocationMode.NoCheck
-            }, cancellationToken).ConfigureAwait(false);
+            }, timeout.Token).ConfigureAwait(false);
             return new SecureSender(client, stream);
         }
         catch
