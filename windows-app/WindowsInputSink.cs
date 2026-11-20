@@ -50,7 +50,7 @@ internal sealed class WindowsInputSink
                 if (!allowClipboard || System.Text.Encoding.UTF8.GetByteCount(clipboard.Text) > 48_000) return false;
                 try { if (clipboard.Text.Length == 0) Clipboard.Clear(); else Clipboard.SetText(clipboard.Text); return true; }
                 catch (ExternalException) { return false; }
-            case ReleaseAllInput: ReleaseAll(); return true;
+            case ReleaseAllInput: return ReleaseAll();
             default: return false;
         }
     }
@@ -97,11 +97,12 @@ internal sealed class WindowsInputSink
     private static bool Mouse(uint flags, uint data) => Send(new Input { Type = InputMouse,
         Data = new InputUnion { Mouse = new MouseInput { Flags = flags, MouseData = data } } });
 
-    public void ReleaseAll()
+    public bool ReleaseAll()
     {
         foreach (int usage in pressedKeys.ToArray()) _ = Key(usage, false);
         foreach (int button in pressedButtons.ToArray()) _ = Button(button, false);
-        // Failed releases stay tracked for a subsequent retry.
+        // Failed releases remain tracked; callers can report and retry.
+        return pressedKeys.Count == 0 && pressedButtons.Count == 0;
     }
 
     private static bool Send(Input input) => SendInput(1, new[] { input }, Marshal.SizeOf<Input>()) == 1;

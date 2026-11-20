@@ -38,7 +38,12 @@ internal static class SecureInputReceiver
         }
         finally
         {
-            try { await dispatch(sink.ReleaseAll).ConfigureAwait(false); }
+            try
+            {
+                bool released = false;
+                await dispatch(() => released = sink.ReleaseAll()).ConfigureAwait(false);
+                if (!released) throw new IOException("Failed to release all injected keys or buttons; restore local input manually.");
+            }
             finally { await stream.DisposeAsync().ConfigureAwait(false); }
         }
     }

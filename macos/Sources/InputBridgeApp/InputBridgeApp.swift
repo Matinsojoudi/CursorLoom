@@ -7,11 +7,13 @@ struct InputBridgeApp: App {
     @StateObject private var sender = SharingController()
     @StateObject private var receiver = ReceiverController()
     var body: some Scene {
-        WindowGroup {
+        Window("CursorLoom", id: "main") {
             TabView {
                 ContentView(controller: sender, receiver: receiver).tabItem { Text("Sender") }
                 ReceiverView(controller: receiver, sender: sender).tabItem { Text("Receiver") }
-            }.frame(minWidth: 600, minHeight: 560)
+            }
+            .frame(minWidth: 600, minHeight: 560)
+            .onDisappear { sender.stop(); receiver.stop() }
         }
     }
 }
