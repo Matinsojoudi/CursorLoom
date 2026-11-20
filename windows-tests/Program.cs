@@ -50,4 +50,10 @@ fixtureDecoder.Finish();
 RemoteInput[] expected = { new KeyInput(4, true), new PointerInput(0.25, 0.75), new ButtonInput(1, false),
     new ScrollInput(-3, 1), new ClipboardInput("سلام 🌍\nline"), new ReleaseAllInput() };
 Assert(fixture.SequenceEqual(expected), "Shared protocol fixtures differ");
+foreach (RemoteInput item in expected)
+{
+    Envelope encoded = InputEncoding.Encode(item);
+    Assert(InputValidator.Parse(MessageCodec.Decode(MessageCodec.Encode(encoded))) == item, "Input encoding mismatch");
+}
+Reject(() => InputEncoding.Encode(new PointerInput(-1, 0)));
 Console.WriteLine("Protocol and session checks passed.");
