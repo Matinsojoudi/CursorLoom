@@ -5,6 +5,8 @@ using System.Security.Authentication;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using InputBridge.Windows;
+using InputBridge.Protocol;
+using System.Text.Json;
 
 static X509Certificate2 CreateIdentity(string name, string usage)
 {
@@ -56,7 +58,31 @@ static async Task CheckAsync(bool validClient, CancellationToken timeout)
     }
 }
 
+static async Task CheckSenderAsync(CancellationToken timeout)
+{
+    using X509Certificate2 server = CreateIdentity("server", "1.3.6.1.5.5.7.3.1");
+    using X509Certificate2 client = CreateIdentity("client", "1.3.6.1.5.5.7.3.2");
+    using var listener = new SecureListener(IPAddress.Loopback, 0, server, SHA256.HashData(client.RawData));
+    listener.Start();
+    Task<SslStream> accept = listener.AcceptAsync(timeout);
+    await using SecureSender sender = await SecureSender.ConnectAsync("127.0.0.1", listener.LocalPort, client, SHA256.HashData(server.RawData), timeout);
+    await using SslStream received = await accept;
+    var payload = new Dictionary<string, JsonElement> { ["usage"] = JsonSerializer.SerializeToElement(4), ["down"] = JsonSerializer.SerializeToElement(true) };
+    await sender.SendAsync(new Envelope(1, "key", payload), timeout);
+    byte[] buffer = new byte[1024];
+    var decoder = new FrameDecoder();
+    IReadOnlyList<Envelope> messages = Array.Empty<Envelope>();
+    while (messages.Count == 0)
+    {
+        int read = await received.ReadAsync(buffer, timeout);
+        if (read == 0) throw new Exception("Connection closed before frame");
+        messages = decoder.Append(buffer.AsSpan(0, read));
+    }
+    if (InputValidator.Parse(messages[0]) != new KeyInput(4, true)) throw new Exception("Sender frame mismatch");
+}
+
 using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+await CheckSenderAsync(timeout.Token);
 await CheckAsync(true, timeout.Token);
 await CheckAsync(false, timeout.Token);
 Console.WriteLine("TLS pin acceptance and rejection passed.");

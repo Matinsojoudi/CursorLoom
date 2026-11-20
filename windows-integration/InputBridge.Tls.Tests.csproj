@@ -8,5 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../windows-app/SecureListener.cs" Link="SecureListener.cs" />
+    <Compile Include="../windows-app/SecureSender.cs" Link="SecureSender.cs" />
+    <ProjectReference Include="../windows/InputBridge.Protocol.csproj" />
   </ItemGroup>
 </Project>
