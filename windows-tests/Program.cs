@@ -56,4 +56,10 @@ foreach (RemoteInput item in expected)
     Assert(InputValidator.Parse(MessageCodec.Decode(MessageCodec.Encode(encoded))) == item, "Input encoding mismatch");
 }
 Reject(() => InputEncoding.Encode(new PointerInput(-1, 0)));
+var router = new DeviceRouter();
+router.Add("a"); router.Add("b");
+Assert(router.Select("a", _ => true), "First target selection failed");
+Assert(router.Select("b", previous => previous == "a"), "Previous target release failed");
+Assert(router.ActivePeer == "b", "Target selection mismatch");
+Assert(!router.Select("a", _ => false) && router.ActivePeer is null && !router.Peers.Contains("b"), "Release failure must fail closed");
 Console.WriteLine("Protocol and session checks passed.");
