@@ -39,19 +39,29 @@ internal sealed class WindowsSenderSession
         }
     }
 
+    private async Task SendQueuedAsync(CancellationToken cancellationToken)
+    {
+        await foreach (RemoteInput input in queue.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+            await sender.SendAsync(InputEncoding.Encode(input), cancellationToken).ConfigureAwait(false);
+    }
+
     /// <summary>The caller must immediately stop local capture if this task completes.</summary>
     public async Task RunAsync(CancellationToken cancellationToken)
     {
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, abort.Token);
+        Task monitor = sender.MonitorPeerAsync(linked.Token);
+        Task sending = SendQueuedAsync(linked.Token);
         try
         {
-            await foreach (RemoteInput input in queue.Reader.ReadAllAsync(linked.Token).ConfigureAwait(false))
-                await sender.SendAsync(InputEncoding.Encode(input), linked.Token).ConfigureAwait(false);
+            Task completed = await Task.WhenAny(monitor, sending).ConfigureAwait(false);
+            await completed.ConfigureAwait(false);
         }
         finally
         {
             Abort();
             await sender.DisposeAsync().ConfigureAwait(false);
+            try { await Task.WhenAll(monitor, sending).ConfigureAwait(false); }
+            catch (Exception error) when (error is OperationCanceledException or IOException or ObjectDisposedException) { }
         }
     }
 }

@@ -79,6 +79,12 @@ static async Task CheckSenderAsync(CancellationToken timeout)
         messages = decoder.Append(buffer.AsSpan(0, read));
     }
     if (InputValidator.Parse(messages[0]) != new KeyInput(4, true)) throw new Exception("Sender frame mismatch");
+    Task monitor = sender.MonitorPeerAsync(timeout);
+    await received.DisposeAsync();
+    bool disconnected = false;
+    try { await monitor; }
+    catch (IOException) { disconnected = true; }
+    if (!disconnected) throw new Exception("Sender did not detect peer disconnect");
 }
 
 static async Task CheckSenderRejectsWrongServerPin(CancellationToken timeout)

@@ -64,11 +64,19 @@ internal sealed class SecureSender : IAsyncDisposable
         finally { sendLock.Release(); }
     }
 
+    /// The protocol is unidirectional; EOF or any unexpected inbound byte ends the session.
+    public async Task MonitorPeerAsync(CancellationToken cancellationToken)
+    {
+        byte[] buffer = new byte[1];
+        int count = await stream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+        throw new IOException(count == 0 ? "Peer disconnected" : "Unexpected data from peer");
+    }
+
     public async ValueTask DisposeAsync()
     {
         await stream.DisposeAsync().ConfigureAwait(false);
         client.Dispose();
         // The owner must await all sends before disposing this instance.
-        sendLock.Dispose();
+        // Do not dispose sendLock: a cancelled concurrent send may still release it.
     }
 }
