@@ -49,7 +49,10 @@ internal sealed class MainWindow : Form
         panel.Controls.Add(new Label { Text = "TCP port:", AutoSize = true }); panel.Controls.Add(port);
         panel.Controls.Add(consent);
         panel.Controls.Add(allowClipboard);
-        var row = new FlowLayoutPanel { AutoSize = true }; row.Controls.Add(start); row.Controls.Add(stop); panel.Controls.Add(row);
+        var row = new FlowLayoutPanel { AutoSize = true }; row.Controls.Add(start); row.Controls.Add(stop);
+        var senderButton = new Button { Text = "Open sender…", AutoSize = true };
+        senderButton.Click += (_, _) => { if (cancellation is not null) return; using var window = new SenderWindow(); window.ShowDialog(this); };
+        row.Controls.Add(senderButton); panel.Controls.Add(row);
         panel.Controls.Add(status); Controls.Add(panel);
         start.Click += async (_, _) => await RunReceiverAsync();
         stop.Click += (_, _) => StopReceiver();
