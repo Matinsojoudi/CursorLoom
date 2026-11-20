@@ -5,7 +5,12 @@ import AppKit
 @main
 struct InputBridgeApp: App {
     var body: some Scene {
-        WindowGroup { ContentView().frame(minWidth: 600, minHeight: 510) }
+        WindowGroup {
+            TabView {
+                ContentView().tabItem { Text("Sender") }
+                ReceiverView().tabItem { Text("Receiver") }
+            }.frame(minWidth: 600, minHeight: 560)
+        }
     }
 }
 
