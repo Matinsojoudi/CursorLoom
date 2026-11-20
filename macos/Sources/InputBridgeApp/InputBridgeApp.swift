@@ -4,18 +4,21 @@ import AppKit
 
 @main
 struct InputBridgeApp: App {
+    @StateObject private var sender = SharingController()
+    @StateObject private var receiver = ReceiverController()
     var body: some Scene {
         WindowGroup {
             TabView {
-                ContentView().tabItem { Text("Sender") }
-                ReceiverView().tabItem { Text("Receiver") }
+                ContentView(controller: sender, receiver: receiver).tabItem { Text("Sender") }
+                ReceiverView(controller: receiver, sender: sender).tabItem { Text("Receiver") }
             }.frame(minWidth: 600, minHeight: 560)
         }
     }
 }
 
 struct ContentView: View {
-    @StateObject private var controller = SharingController()
+    @ObservedObject var controller: SharingController
+    @ObservedObject var receiver: ReceiverController
     @State private var isTrusted = AXIsProcessTrusted()
     @State private var host = ""
     @State private var port = "24800"
@@ -43,7 +46,7 @@ struct ContentView: View {
             }
             Toggle("Also send clipboard text (may contain sensitive data)", isOn: $shareClipboard).disabled(controller.sharing)
             HStack {
-                Button("Connect") { connect() }.disabled(controller.connected)
+                Button("Connect") { connect() }.disabled(controller.active || receiver.active)
                 Button("Disconnect") { controller.stop() }
                 Button("Share input…") { showConsent = true }.disabled(!controller.connected || controller.sharing)
                 Button("Stop sharing") { controller.stopSharing() }.disabled(!controller.sharing)
@@ -72,7 +75,7 @@ struct ContentView: View {
         } message: {
             Text("Local input will also remain active. Do not type passwords while sharing. You can stop using the Stop sharing button.")
         }
-        .onDisappear { controller.stop(); shareClipboard = false; password = "" }
+        .onDisappear { password = "" }
         .onChange(of: controller.connected) { connected in
             if !connected { shareClipboard = false }
         }

@@ -8,6 +8,7 @@ final class SharingController: ObservableObject {
     @Published private(set) var status = "Stopped"
     @Published private(set) var connected = false
     @Published private(set) var sharing = false
+    @Published private(set) var active = false
     private var sender: SecureInputSender?
     private var capture: MacInputCapture?
     private var session: InputSession?
@@ -23,6 +24,7 @@ final class SharingController: ObservableObject {
                                                     identity: identity, callbackQueue: .main)
         let newSender = SecureInputSender(connection: connection, queue: .main) { [weak self] error in
             self?.stopClipboard()
+            self?.active = false
             self?.connected = false
             self?.sharing = false
             self?.session?.disconnect()
@@ -39,6 +41,7 @@ final class SharingController: ObservableObject {
         try newSession.beginConnection()
         sender = newSender
         session = newSession
+        active = true
         status = "Connecting…"
         newSender.start { [weak self, weak newSession] in
             do { try newSession?.authenticated(); self?.connected = true; self?.status = "Connected — sharing off" }
@@ -96,6 +99,7 @@ final class SharingController: ObservableObject {
         session = nil
         capture = nil
         sender = nil
+        active = false
         connected = false
         sharing = false
         status = "Stopped"

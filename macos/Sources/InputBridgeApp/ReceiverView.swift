@@ -3,7 +3,8 @@ import AppKit
 import ApplicationServices
 
 struct ReceiverView: View {
-    @StateObject private var controller = ReceiverController()
+    @ObservedObject var controller: ReceiverController
+    @ObservedObject var sender: SharingController
     @State private var certificateURL: URL?
     @State private var password = ""
     @State private var fingerprint = ""
@@ -34,7 +35,7 @@ struct ReceiverView: View {
             Toggle("Allow this verified device to control this Mac", isOn: $consent).disabled(controller.active)
             Toggle("Allow incoming clipboard text to replace local clipboard", isOn: $allowClipboard).disabled(controller.active)
             HStack {
-                Button("Start receiver") { start() }.disabled(controller.active || !consent)
+                Button("Start receiver") { start() }.disabled(controller.active || sender.active || !consent)
                 Button("Stop") { controller.stop() }.disabled(!controller.active)
             }
             Text(controller.status).font(.headline)
@@ -46,7 +47,7 @@ struct ReceiverView: View {
         .onChange(of: controller.active) { active in
             if !active { consent = false; allowClipboard = false }
         }
-        .onDisappear { controller.stop(); password = ""; consent = false; allowClipboard = false }
+        .onDisappear { password = "" }
     }
 
     private func start() {
