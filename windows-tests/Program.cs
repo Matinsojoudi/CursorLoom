@@ -56,6 +56,8 @@ foreach (RemoteInput item in expected)
     Assert(InputValidator.Parse(MessageCodec.Decode(MessageCodec.Encode(encoded))) == item, "Input encoding mismatch");
 }
 Reject(() => InputEncoding.Encode(new PointerInput(-1, 0)));
+try { new DeviceRouter().Add(new string('ا', 65)); throw new Exception("Oversize UTF-8 peer ID accepted"); }
+catch (ArgumentException) { }
 var router = new DeviceRouter();
 router.Add("a"); router.Add("b");
 Assert(router.Select("a", _ => true), "First target selection failed");

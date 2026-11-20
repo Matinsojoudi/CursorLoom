@@ -14,7 +14,7 @@ public sealed class DeviceRouter
 
     public void Add(string peer)
     {
-        if (string.IsNullOrWhiteSpace(peer) || peer.Length > 128) throw new ArgumentException("Invalid peer ID", nameof(peer));
+        if (string.IsNullOrWhiteSpace(peer) || System.Text.Encoding.UTF8.GetByteCount(peer) > 128) throw new ArgumentException("Invalid peer ID", nameof(peer));
         if (peers.Contains(peer)) throw new InvalidOperationException("Duplicate peer ID");
         if (peers.Count >= MaximumPeers) throw new InvalidOperationException("Peer limit reached");
         peers.Add(peer);

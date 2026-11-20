@@ -21,6 +21,8 @@ final class DeviceRouterTests: XCTestCase {
         var router = DeviceRouter()
         for peer in ["a", "b", "c", "d"] { try router.add(peer) }
         XCTAssertThrowsError(try router.add("e"))
+        var emptyRouter = DeviceRouter()
+        XCTAssertThrowsError(try emptyRouter.add(String(repeating: "ا", count: 65)))
         XCTAssertTrue(try router.select("a") { _ in true })
         XCTAssertFalse(try router.select("b") { _ in false })
         XCTAssertNil(router.activePeer)
