@@ -102,7 +102,24 @@ static async Task CheckSenderRejectsWrongServerPin(CancellationToken timeout)
     if (!rejected) throw new Exception("Sender accepted wrong server pin");
 }
 
-using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+static async Task CheckStalledHandshakeAsync(CancellationToken timeout)
+{
+    using X509Certificate2 server = CreateIdentity("server", "1.3.6.1.5.5.7.3.1");
+    using X509Certificate2 client = CreateIdentity("client", "1.3.6.1.5.5.7.3.2");
+    using var listener = new SecureListener(IPAddress.Loopback, 0, server, SHA256.HashData(client.RawData));
+    listener.Start();
+    Task<SslStream> accept = listener.AcceptAsync(timeout);
+    using var raw = new TcpClient();
+    await raw.ConnectAsync(IPAddress.Loopback, listener.LocalPort, timeout);
+    using var guard = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+    bool timedOut = false;
+    try { await using SslStream unexpected = await accept.WaitAsync(guard.Token); }
+    catch (OperationCanceledException) when (!guard.IsCancellationRequested && !timeout.IsCancellationRequested) { timedOut = true; }
+    if (!timedOut) throw new Exception("Stalled TLS handshake did not time out");
+}
+
+using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+await CheckStalledHandshakeAsync(timeout.Token);
 await CheckSenderRejectsWrongServerPin(timeout.Token);
 await CheckSenderAsync(timeout.Token);
 await CheckAsync(true, timeout.Token);
