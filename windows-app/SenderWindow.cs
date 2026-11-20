@@ -66,11 +66,10 @@ internal sealed class SenderWindow : Form
             status.Text = "Connecting…";
             sender = await SecureSender.ConnectAsync(host.Text, (int)port.Value, identity, peerPin, cts.Token);
             var pump = new WindowsSenderSession(sender);
-            sender = null; // ownership moved to pump
             session = pump;
             capture = new WindowsInputCapture(input =>
             {
-                if (!pump.Offer(input)) { capture?.Dispose(); capture = null; }
+                if (!pump.Offer(input)) Stop();
             });
             capture.Start();
             if (sendClipboard)
@@ -81,6 +80,7 @@ internal sealed class SenderWindow : Form
                 });
             }
             status.Text = "Sharing input; local input remains active. Press Stop.";
+            sender = null; // RunAsync owns and disposes the sender from this point.
             await pump.RunAsync(cts.Token);
             status.Text = "Stopped";
         }

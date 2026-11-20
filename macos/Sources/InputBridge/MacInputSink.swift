@@ -105,6 +105,6 @@ public final class MacInputSink {
         for button in Array(pressedButtons) {
             _ = self.button(button, down: false)
         }
-        pressedButtons.removeAll()
+        // Failed button releases remain tracked for a later retry.
     }
 }
