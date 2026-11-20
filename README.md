@@ -18,6 +18,18 @@ Initial event types: `hello`, `pointer`, `button`, `key`, `scroll`, `clipboard`,
 
 For the unexecuted cross-platform test matrix and safety checks, see [INTEROPERABILITY.md](INTEROPERABILITY.md). For the multi-device design and remaining work, see [MULTI_DEVICE_PLAN.md](MULTI_DEVICE_PLAN.md).
 
+## Quick start (experimental, one-to-one)
+
+1. Generate throwaway identities on any trusted machine: `./tools/make-test-certs.sh ./cursorloom-certs`. It prints both SHA-256 fingerprints. `client.p12` belongs on the sender, `server.p12` on the receiver, regardless of operating system.
+2. On the receiver (either OS): open the Receiver panel, choose `server.p12`, type the certificate password, paste the **client** fingerprint, pick a port (default 24800), tick the consent checkbox and start. Allow the local-network/firewall prompt for private networks only.
+3. On the sender (either OS): open the Sender panel, enter the receiver's LAN address and the same port, choose `client.p12`, type its password, paste the **server** fingerprint, then connect. Only then press the share/start button and confirm the consent dialog.
+4. Stop sharing or close the app to end the session. Held keys are released on the receiver when the connection closes.
+
+On a receiving Mac, grant Accessibility (input injection) and Input Monitoring (capture) in System Settings → Privacy & Security. On Windows, keep the app at the same integrity level as the apps you want to control: it cannot type into elevated windows.
+
+Local input keeps working during a session, so everything you type is also sent to the other computer. Do not enter passwords. Screen-edge switching, multi-device routing and automatic pairing do not work yet; see the plan documents above.
+
+
 ## Development status
 The current main branch has experimental sender and receiver UIs on both macOS and Windows. Each one-to-one session requires manual identity and pin configuration and explicit consent. Each sender can optionally send text clipboard changes; each receiver separately opts in. Cross-device behavior, keyboard mappings, modifier keys and clipboard have not been tested on real devices. Input capture is passive: activity is mirrored locally as well as sent remotely. Concurrent multi-device sessions, integrated screen-edge switching, automatic pairing, multi-monitor handling and installers are not implemented. A grid and routing state model exists but is not connected to the UI or network. GitHub Actions builds Windows and runs Swift tests; loopback TLS tests check certificate pin acceptance/rejection separately on each OS, and shared fixtures exercise protocol parsing. These checks do not establish a real connection between computers. The published v0.2 alpha predates the newer sender/receiver UI and does not contain it.
 
