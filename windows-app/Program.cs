@@ -65,6 +65,9 @@ internal sealed class MainWindow : Form
         buttons.Controls.Add(shareButton);
         buttons.Controls.Add(stopButton);
         root.Controls.Add(buttons);
+        var firewallButton = new Button { Text = "Allow through Windows Firewall…", AutoSize = true };
+        firewallButton.Click += (_, _) => AllowFirewall();
+        root.Controls.Add(firewallButton);
         root.Controls.Add(new Label
         {
             AutoSize = true, ForeColor = SystemColors.GrayText,
@@ -77,6 +80,30 @@ internal sealed class MainWindow : Form
         stopButton.Click += (_, _) => StopSharing();
         FormClosing += (_, _) => { closing = true; StopSharing(); StopReceiver(); discovery?.Dispose(); };
         Load += (_, _) => StartDiscovery();
+    }
+
+    /// <summary>
+    /// Inbound connections are blocked by Windows Firewall until the user allows the
+    /// program. This asks for elevation once and adds a Private-profile rule.
+    /// </summary>
+    private void AllowFirewall()
+    {
+        string exe = Environment.ProcessPath ?? Application.ExecutablePath;
+        string script =
+            $"New-NetFirewallRule -DisplayName 'CursorLoom' -Direction Inbound -Program '{exe}' " +
+            "-Action Allow -Profile Private -ErrorAction SilentlyContinue";
+        try
+        {
+            var start = new System.Diagnostics.ProcessStartInfo("powershell.exe",
+                $"-NoProfile -WindowStyle Hidden -Command \"{script}\"")
+            { UseShellExecute = true, Verb = "runas" };
+            System.Diagnostics.Process.Start(start);
+            status.Text = "Firewall rule added for private networks — try Connect again";
+        }
+        catch (Exception error) when (error is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            status.Text = "Firewall rule not added (cancelled) — allow CursorLoom manually";
+        }
     }
 
     private void StartDiscovery()
