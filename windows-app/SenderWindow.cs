@@ -13,12 +13,14 @@ internal sealed class SenderWindow : Form
     private readonly TextBox password = new() { Width = 200, UseSystemPasswordChar = true };
     private readonly TextBox pin = new() { Width = 420 };
     private readonly CheckBox consent = new() { AutoSize = true, Text = "Send my mouse and keyboard to this device" };
+    private readonly CheckBox shareClipboard = new() { AutoSize = true, Text = "Also send clipboard text (may contain sensitive data)" };
     private readonly Button start = new() { Text = "Connect and share", AutoSize = true };
     private readonly Button stop = new() { Text = "Stop", AutoSize = true, Enabled = false };
     private readonly Label status = new() { Text = "Stopped", AutoSize = true };
     private CancellationTokenSource? cancellation;
     private WindowsSenderSession? session;
     private WindowsInputCapture? capture;
+    private ClipboardMonitor? clipboard;
     private bool closeWhenStopped;
 
     public SenderWindow()
@@ -38,6 +40,7 @@ internal sealed class SenderWindow : Form
         panel.Controls.Add(new Label { Text = "Identity password:", AutoSize = true }); panel.Controls.Add(password);
         panel.Controls.Add(new Label { Text = "Receiver certificate SHA-256 fingerprint:", AutoSize = true }); panel.Controls.Add(pin);
         panel.Controls.Add(consent);
+        panel.Controls.Add(shareClipboard);
         var buttons = new FlowLayoutPanel { AutoSize = true }; buttons.Controls.Add(start); buttons.Controls.Add(stop); panel.Controls.Add(buttons);
         panel.Controls.Add(status); Controls.Add(panel);
         start.Click += async (_, _) => await RunAsync();
@@ -58,7 +61,8 @@ internal sealed class SenderWindow : Form
             identity = new X509Certificate2(certificatePath.Text, password.Text, X509KeyStorageFlags.UserKeySet);
             password.Clear();
             cts = new CancellationTokenSource(); cancellation = cts;
-            start.Enabled = false; stop.Enabled = true; consent.Enabled = false;
+            bool sendClipboard = shareClipboard.Checked;
+            start.Enabled = false; stop.Enabled = true; consent.Enabled = false; shareClipboard.Enabled = false;
             status.Text = "Connecting…";
             sender = await SecureSender.ConnectAsync(host.Text, (int)port.Value, identity, peerPin, cts.Token);
             var pump = new WindowsSenderSession(sender);
@@ -69,6 +73,13 @@ internal sealed class SenderWindow : Form
                 if (!pump.Offer(input)) { capture?.Dispose(); capture = null; }
             });
             capture.Start();
+            if (sendClipboard)
+            {
+                clipboard = new ClipboardMonitor(text =>
+                {
+                    if (!pump.Offer(new ClipboardInput(text))) Stop();
+                });
+            }
             status.Text = "Sharing input; local input remains active. Press Stop.";
             await pump.RunAsync(cts.Token);
             status.Text = "Stopped";
@@ -78,12 +89,14 @@ internal sealed class SenderWindow : Form
         { status.Text = "Stopped: " + error.Message; }
         finally
         {
+            clipboard?.Dispose(); clipboard = null;
             capture?.Dispose(); capture = null;
             session?.Abort(); session = null;
             if (sender is not null) await sender.DisposeAsync();
             identity?.Dispose(); password.Clear();
             cancellation = null; cts?.Dispose();
             consent.Checked = false; consent.Enabled = true;
+            shareClipboard.Checked = false; shareClipboard.Enabled = true;
             start.Enabled = true; stop.Enabled = false;
             if (closeWhenStopped) Close();
         }
@@ -91,6 +104,7 @@ internal sealed class SenderWindow : Form
 
     private void Stop()
     {
+        clipboard?.Dispose(); clipboard = null;
         capture?.Dispose(); capture = null;
         session?.Abort();
         cancellation?.Cancel();
