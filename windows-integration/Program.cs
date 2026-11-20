@@ -81,7 +81,23 @@ static async Task CheckSenderAsync(CancellationToken timeout)
     if (InputValidator.Parse(messages[0]) != new KeyInput(4, true)) throw new Exception("Sender frame mismatch");
 }
 
+static async Task CheckSenderRejectsWrongServerPin(CancellationToken timeout)
+{
+    using X509Certificate2 server = CreateIdentity("server", "1.3.6.1.5.5.7.3.1");
+    using X509Certificate2 client = CreateIdentity("client", "1.3.6.1.5.5.7.3.2");
+    using var listener = new SecureListener(IPAddress.Loopback, 0, server, SHA256.HashData(client.RawData));
+    listener.Start();
+    Task<SslStream> accept = listener.AcceptAsync(timeout);
+    bool rejected = false;
+    try { await using var sender = await SecureSender.ConnectAsync("127.0.0.1", listener.LocalPort, client, new byte[32], timeout); }
+    catch (Exception error) when (error is AuthenticationException or IOException) { rejected = true; }
+    try { await using SslStream unexpected = await accept; }
+    catch (Exception error) when (error is AuthenticationException or IOException) { }
+    if (!rejected) throw new Exception("Sender accepted wrong server pin");
+}
+
 using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+await CheckSenderRejectsWrongServerPin(timeout.Token);
 await CheckSenderAsync(timeout.Token);
 await CheckAsync(true, timeout.Token);
 await CheckAsync(false, timeout.Token);

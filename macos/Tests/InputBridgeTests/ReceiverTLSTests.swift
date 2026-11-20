@@ -29,6 +29,7 @@ final class ReceiverTLSTests: XCTestCase {
         }
         let serverIdentity = try identity("server")
         let clientIdentity = try identity("client")
+        let wrongIdentity = try identity("untrusted")
         let queue = DispatchQueue(label: "receiver-test")
         let listener = try SecureTransport.listener(port: 0, fingerprint: Identity.fingerprint(of: clientIdentity), identity: serverIdentity, callbackQueue: queue)
         let ready = expectation(description: "listener ready")
@@ -61,5 +62,26 @@ final class ReceiverTLSTests: XCTestCase {
         wait(for: [sent, applied], timeout: 10)
         client.cancel()
         wait(for: [released], timeout: 10)
+
+        let rejected = expectation(description: "untrusted client rejected")
+        let notApplied = expectation(description: "untrusted input never applied")
+        notApplied.isInverted = true
+        listener.newConnectionHandler = { connection in
+            receiver = SecureInputReceiver(connection: connection, queue: queue, apply: { _ in
+                notApplied.fulfill(); return true
+            }, release: {}, finished: { _ in rejected.fulfill() })
+            receiver?.start()
+        }
+        let wrongClient = try SecureTransport.client(host: "127.0.0.1", port: port,
+                                                     fingerprint: Identity.fingerprint(of: serverIdentity),
+                                                     identity: wrongIdentity, callbackQueue: queue)
+        wrongClient.stateUpdateHandler = { state in
+            if case .ready = state, let data = try? InputEncoding.encode(.key(usage: 4, down: true)) {
+                wrongClient.send(content: data, completion: .contentProcessed { _ in })
+            }
+        }
+        wrongClient.start(queue: queue)
+        wait(for: [rejected, notApplied], timeout: 4)
+        wrongClient.cancel()
     }
 }
