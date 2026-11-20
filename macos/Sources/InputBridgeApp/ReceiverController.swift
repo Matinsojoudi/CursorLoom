@@ -35,13 +35,18 @@ final class ReceiverController: ObservableObject {
             // Accept only one connection, even before authentication, and stop listening.
             self.listener?.cancel()
             self.listener = nil
+            var releaseSucceeded = true
             let instance = SecureInputReceiver(connection: connection, queue: .main, apply: { input in
                 inputSink.apply(input, allowClipboard: allowClipboard)
-            }, release: { inputSink.releaseAll() }, finished: { [weak self] error in
+            }, release: { releaseSucceeded = inputSink.releaseAll() }, finished: { [weak self] error in
                 self?.receiver = nil
                 self?.sink = nil
                 self?.active = false
-                self?.status = error.map { "Receiver stopped: \($0.localizedDescription)" } ?? "Receiver disconnected"
+                if !releaseSucceeded {
+                    self?.status = "Could not release all inputs. Restore local input manually."
+                } else {
+                    self?.status = error.map { "Receiver stopped: \($0.localizedDescription)" } ?? "Receiver disconnected"
+                }
             })
             self.receiver = instance
             self.status = "Authenticating device…"
@@ -54,11 +59,12 @@ final class ReceiverController: ObservableObject {
         precondition(Thread.isMainThread)
         listener?.cancel()
         listener = nil
+        let hadReceiver = receiver != nil
         receiver?.stop()
         receiver = nil
         sink = nil
         active = false
-        status = "Receiver stopped"
+        if !hadReceiver { status = "Receiver stopped" }
     }
 
     enum ReceiverError: Error { case consentRequired, alreadyRunning, invalidPort }

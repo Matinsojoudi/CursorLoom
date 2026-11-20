@@ -92,19 +92,20 @@ public final class MacInputSink {
             pasteboard.clearContents()
             return pasteboard.setString(text, forType: .string)
         case .releaseAll:
-            releaseAll()
-            return true
+            return releaseAll()
         }
     }
 
-    public func releaseAll() {
-        for code in pressedKeys {
-            CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: false)?.post(tap: .cghidEventTap)
+    @discardableResult
+    public func releaseAll() -> Bool {
+        guard AXIsProcessTrusted() else { return pressedKeys.isEmpty && pressedButtons.isEmpty }
+        for code in Array(pressedKeys) {
+            guard let event = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: false) else { continue }
+            event.post(tap: .cghidEventTap)
+            pressedKeys.remove(code)
         }
-        pressedKeys.removeAll()
-        for button in Array(pressedButtons) {
-            _ = self.button(button, down: false)
-        }
-        // Failed button releases remain tracked for a later retry.
+        for button in Array(pressedButtons) { _ = self.button(button, down: false) }
+        // CGEvent.post provides no delivery acknowledgement; this reports creation only.
+        return pressedKeys.isEmpty && pressedButtons.isEmpty
     }
 }
