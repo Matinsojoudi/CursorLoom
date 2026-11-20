@@ -1,0 +1,61 @@
+name: Build experimental installers
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test and build
+        working-directory: macos
+        run: |
+          CURSORLOOM_TLS_INTEGRATION=1 swift test -Xswiftc -warnings-as-errors
+          swift build -c release -Xswiftc -warnings-as-errors
+      - name: Package unsigned macOS installer
+        run: |
+          set -euo pipefail
+          mkdir -p package-root/Applications/CursorLoom.app/Contents/MacOS installer-output
+          cp packaging/macos/Info.plist package-root/Applications/CursorLoom.app/Contents/Info.plist
+          cp "$(cd macos && swift build -c release --show-bin-path)/InputBridgeApp" package-root/Applications/CursorLoom.app/Contents/MacOS/
+          chmod 755 package-root/Applications/CursorLoom.app/Contents/MacOS/InputBridgeApp
+          plutil -lint package-root/Applications/CursorLoom.app/Contents/Info.plist
+          pkgbuild --root package-root --identifier com.cursorloom.experimental.installer --version 0.4.0 --install-location / installer-output/CursorLoom-macOS-arm64-Installer-alpha.pkg
+          pkgutil --check-signature installer-output/CursorLoom-macOS-arm64-Installer-alpha.pkg || true
+          pkgutil --expand installer-output/CursorLoom-macOS-arm64-Installer-alpha.pkg /tmp/cursorloom-pkg-inspect
+          test -f /tmp/cursorloom-pkg-inspect/PackageInfo
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CursorLoom-macOS-installer
+          path: installer-output/*.pkg
+          if-no-files-found: error
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Test and publish self-contained application
+        run: |
+          dotnet run --project windows-tests/InputBridge.Protocol.Tests.csproj --configuration Release
+          dotnet run --project windows-integration/InputBridge.Tls.Tests.csproj --configuration Release
+          dotnet publish windows-app/InputBridge.Windows.csproj -c Release -r win-x64 --self-contained true -o publish-windows
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build and inspect Inno Setup installer
+        shell: pwsh
+        run: |
+          $compiler = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          if (!(Test-Path $compiler)) { throw "Inno Setup compiler not installed on runner" }
+          & $compiler packaging/windows/CursorLoom.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $path = 'installer-output/CursorLoom-Windows-x64-Setup-alpha.exe'
+          if (!(Test-Path $path)) { throw 'Installer missing' }
+          $signature = Get-AuthenticodeSignature $path
+          Write-Host "Signature status: $($signature.Status)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CursorLoom-Windows-installer
+          path: installer-output/*.exe
+          if-no-files-found: error
