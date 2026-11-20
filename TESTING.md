@@ -1,6 +1,6 @@
 # Manual interoperability test plan (not yet run)
 
-This is an experimental test, not production guidance. Use dedicated test accounts and an isolated trusted network. Do not type passwords or sensitive text while capture is active: the sender mirrors all supported keyboard input to the peer and also leaves it active locally. Never expose the listener to the Internet. Each peer pin must be independently verified out-of-band. Stop immediately if input sticks; sign out or use a separate physical input device if required.
+This is an experimental macOS-sender-to-Windows-receiver test, not production guidance. The current main branch also has experimental Windows sender and macOS receiver UIs; other combinations are not covered by this checklist and have not been validated. Use dedicated test accounts and an isolated trusted network. Do not type passwords or sensitive text while capture is active: the sender mirrors all supported keyboard input to the peer and also leaves it active locally. Never expose the listener to the Internet. Each peer pin must be independently verified out-of-band. Stop immediately if input sticks; sign out or use a separate physical input device if required.
 
 ## Preparation
 
