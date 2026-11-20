@@ -84,4 +84,8 @@ Assert(await coordinator.SelectAsync("a", CancellationToken.None), "Coordinator 
 Assert(await coordinator.SelectAsync("b", CancellationToken.None) && released == 1, "Coordinator failed to release previous");
 Assert(!await coordinator.SelectAsync("a", CancellationToken.None), "Coordinator accepted failed release");
 Assert(await coordinator.DestinationAsync(new KeyInput(4, true), new HashSet<string>(), CancellationToken.None) is null, "Failed switch must leave local active");
+const string releaseId = "12345678-1234-1234-1234-123456789abc";
+Assert(ReleaseAcknowledgement.ParseRequest(MessageCodec.Decode(MessageCodec.Encode(ReleaseAcknowledgement.Request(releaseId)))) == releaseId, "Release request mismatch");
+Assert(ReleaseAcknowledgement.ParseResponse(MessageCodec.Decode(MessageCodec.Encode(ReleaseAcknowledgement.Response(releaseId, false)))) == (releaseId, false), "Release acknowledgement mismatch");
+Reject(() => ReleaseAcknowledgement.Request("not-a-uuid"));
 Console.WriteLine("Protocol and session checks passed.");
