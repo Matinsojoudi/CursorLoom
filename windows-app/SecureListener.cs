@@ -34,6 +34,7 @@ internal sealed class SecureListener : IDisposable
     public async Task<SslStream> AcceptAsync(CancellationToken cancellationToken)
     {
         TcpClient client = await listener.AcceptTcpClientAsync(cancellationToken).ConfigureAwait(false);
+        client.NoDelay = true;
         var stream = new SslStream(client.GetStream(), leaveInnerStreamOpen: false,
             userCertificateValidationCallback: (_, peer, _, _) =>
                 peer is not null && CryptographicOperations.FixedTimeEquals(SHA256.HashData(peer.GetRawCertData()), peerPin));

@@ -41,7 +41,9 @@ public enum SecureTransport {
             let actual = Data(SHA256.hash(data: SecCertificateCopyData(leaf) as Data))
             complete(constantTimeEqual(actual, fingerprint))
         }, callbackQueue)
-        let parameters = NWParameters(tls: tls, tcp: NWProtocolTCP.Options())
+        let tcp = NWProtocolTCP.Options()
+        tcp.noDelay = true
+        let parameters = NWParameters(tls: tls, tcp: tcp)
         return NWConnection(host: NWEndpoint.Host(host), port: endpointPort, using: parameters)
     }
 
@@ -66,7 +68,9 @@ public enum SecureTransport {
             let actual = Data(SHA256.hash(data: SecCertificateCopyData(leaf) as Data))
             complete(constantTimeEqual(actual, fingerprint))
         }, callbackQueue)
-        return try NWListener(using: NWParameters(tls: tls, tcp: NWProtocolTCP.Options()), on: endpointPort)
+        let tcp = NWProtocolTCP.Options()
+        tcp.noDelay = true
+        return try NWListener(using: NWParameters(tls: tls, tcp: tcp), on: endpointPort)
     }
 
     private static func constantTimeEqual(_ lhs: Data, _ rhs: Data) -> Bool {

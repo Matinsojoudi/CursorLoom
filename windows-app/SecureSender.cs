@@ -34,6 +34,7 @@ internal sealed class SecureSender : IAsyncDisposable
         SslStream? stream = null;
         try
         {
+            client.NoDelay = true;
             await client.ConnectAsync(host, port, cancellationToken).ConfigureAwait(false);
             stream = new SslStream(client.GetStream(), leaveInnerStreamOpen: false,
                 (_, peer, _, _) => peer is not null && CryptographicOperations.FixedTimeEquals(
