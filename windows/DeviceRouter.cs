@@ -41,6 +41,14 @@ public sealed class DeviceRouter
         return true;
     }
 
+    /// <summary>Only the active peer receives input; clipboard needs a separate grant.</summary>
+    public string? Destination(RemoteInput input, IReadOnlySet<string> clipboardAllowed)
+    {
+        if (ActivePeer is null) return null;
+        if (input is ClipboardInput && !clipboardAllowed.Contains(ActivePeer)) return null;
+        return ActivePeer;
+    }
+
     /// <summary>Call on disconnect; local input becomes active if this was selected.</summary>
     public void Remove(string peer)
     {

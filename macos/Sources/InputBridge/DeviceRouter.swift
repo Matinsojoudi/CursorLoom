@@ -36,6 +36,13 @@ public struct DeviceRouter {
         return true
     }
 
+    /// Route only to the selected peer; clipboard requires a separate per-peer grant.
+    public func destination(for input: RemoteInput, clipboardAllowed: Set<String>) -> String? {
+        guard let activePeer else { return nil }
+        if case .clipboard = input, !clipboardAllowed.contains(activePeer) { return nil }
+        return activePeer
+    }
+
     public mutating func remove(_ peer: String) {
         peers.remove(peer)
         if activePeer == peer { activePeer = nil }

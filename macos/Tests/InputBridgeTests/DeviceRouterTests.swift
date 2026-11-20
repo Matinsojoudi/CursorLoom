@@ -10,6 +10,9 @@ final class DeviceRouterTests: XCTestCase {
         XCTAssertTrue(try router.select("b") { releases.append($0); return true })
         XCTAssertEqual(releases, ["a"])
         XCTAssertEqual(router.activePeer, "b")
+        XCTAssertEqual(router.destination(for: .key(usage: 4, down: true), clipboardAllowed: []), "b")
+        XCTAssertNil(router.destination(for: .clipboard(text: "private"), clipboardAllowed: ["a"]))
+        XCTAssertEqual(router.destination(for: .clipboard(text: "ok"), clipboardAllowed: ["b"]), "b")
         router.remove("b")
         XCTAssertNil(router.activePeer)
     }
