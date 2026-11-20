@@ -9,7 +9,6 @@ final class DeviceIdentityTests: XCTestCase {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let derURL = directory.appendingPathComponent("cert.der")
-        let pemURL = directory.appendingPathComponent("cert.pem")
         try created.der.write(to: derURL)
 
         func run(_ arguments: [String]) throws -> String {

@@ -73,6 +73,36 @@ public enum SecureTransport {
         return try NWListener(using: NWParameters(tls: tls, tcp: tcp), on: endpointPort)
     }
 
+    /// Pairing listener: encryption and a verified TLS handshake are required, but the
+    /// trust decision is the user's explicit consent prompt. The observed peer
+    /// fingerprint is reported so the UI can show and later pin it.
+    public static func pairingListener(port: UInt16, identity: SecIdentity,
+                                       callbackQueue: DispatchQueue,
+                                       onPeerCertificate: @escaping (Data) -> Void) throws -> NWListener {
+        let endpointPort: NWEndpoint.Port
+        if port == 0 { endpointPort = .any }
+        else { guard let parsed = NWEndpoint.Port(rawValue: port) else { throw ConfigurationError.invalidPort }; endpointPort = parsed }
+        let tls = NWProtocolTLS.Options()
+        guard let localIdentity = sec_identity_create(identity) else { throw ConfigurationError.invalidIdentity }
+        sec_protocol_options_set_local_identity(tls.securityProtocolOptions, localIdentity)
+        sec_protocol_options_set_min_tls_protocol_version(tls.securityProtocolOptions, .TLSv13)
+        sec_protocol_options_set_max_tls_protocol_version(tls.securityProtocolOptions, .TLSv13)
+        sec_protocol_options_set_peer_authentication_required(tls.securityProtocolOptions, true)
+        sec_protocol_options_set_verify_block(tls.securityProtocolOptions, { _, trust, complete in
+            let reference = sec_trust_copy_ref(trust).takeRetainedValue()
+            guard let chain = SecTrustCopyCertificateChain(reference) as? [SecCertificate],
+                  let leaf = chain.first else { complete(false); return }
+            let fingerprint = Data(SHA256.hash(data: SecCertificateCopyData(leaf) as Data))
+            onPeerCertificate(fingerprint)
+            // Chain trust is intentionally bypassed: the pinned fingerprint observed
+            // at consent time is what identifies the peer for this session.
+            complete(true)
+        }, callbackQueue)
+        let tcp = NWProtocolTCP.Options()
+        tcp.noDelay = true
+        return try NWListener(using: NWParameters(tls: tls, tcp: tcp), on: endpointPort)
+    }
+
     private static func constantTimeEqual(_ lhs: Data, _ rhs: Data) -> Bool {
         guard lhs.count == rhs.count else { return false }
         return zip(lhs, rhs).reduce(UInt8(0)) { $0 | ($1.0 ^ $1.1) } == 0

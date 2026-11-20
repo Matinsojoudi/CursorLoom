@@ -1,108 +1,102 @@
 import SwiftUI
-import ApplicationServices
 import AppKit
+import ApplicationServices
 
 @main
-struct InputBridgeApp: App {
-    @StateObject private var sender = SharingController()
-    @StateObject private var receiver = ReceiverController()
+struct CursorLoomApp: App {
+    @StateObject private var model = AppModel()
     var body: some Scene {
         Window("CursorLoom", id: "main") {
-            TabView {
-                ContentView(controller: sender, receiver: receiver).tabItem { Text("Sender") }
-                ReceiverView(controller: receiver, sender: sender).tabItem { Text("Receiver") }
-            }
-            .frame(minWidth: 600, minHeight: 560)
-            .onDisappear { sender.stop(); receiver.stop() }
+            ContentView(model: model)
+                .frame(minWidth: 420, minHeight: 460)
+                .onDisappear { model.disconnect() }
         }
     }
 }
 
 struct ContentView: View {
-    @ObservedObject var controller: SharingController
-    @ObservedObject var receiver: ReceiverController
-    @State private var isTrusted = AXIsProcessTrusted()
-    @State private var host = ""
-    @State private var port = "24800"
-    @State private var certificateURL: URL?
-    @State private var password = ""
-    @State private var fingerprint = ""
-    @State private var errorMessage = ""
-    @State private var showConsent = false
-    @State private var shareClipboard = false
+    @ObservedObject var model: AppModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("CursorLoom — experimental sender").font(.title2.bold())
-            Text("One-way test only. Local input remains active while sharing. Clipboard is opt-in on both devices.")
-                .foregroundStyle(.secondary)
-            Form {
-                TextField("Windows IP or hostname", text: $host)
-                TextField("TCP port", text: $port)
-                HStack {
-                    Text(certificateURL?.lastPathComponent ?? "No identity selected")
-                    Button("Choose PKCS#12…") { chooseCertificate() }
-                }
-                SecureField("Identity password", text: $password)
-                TextField("Windows certificate SHA-256 fingerprint", text: $fingerprint)
-            }
-            Toggle("Also send clipboard text (may contain sensitive data)", isOn: $shareClipboard).disabled(controller.sharing)
-            HStack {
-                Button("Connect") { connect() }.disabled(controller.active || receiver.active)
-                Button("Disconnect") { controller.stop() }
-                Button("Share input…") { showConsent = true }.disabled(!controller.connected || controller.sharing)
-                Button("Stop sharing") { controller.stopSharing() }.disabled(!controller.sharing)
-            }
-            Text(controller.status).font(.headline)
-            if !errorMessage.isEmpty { Text(errorMessage).foregroundStyle(.red).textSelection(.enabled) }
+        VStack(alignment: .leading, spacing: 14) {
+            Text("CursorLoom").font(.largeTitle.bold())
+            Text(model.status).foregroundStyle(.secondary)
+
+            Toggle("Let another device control this Mac", isOn: $model.allowControl)
+                .toggleStyle(.switch)
+
             Divider()
-            Label(isTrusted ? "Accessibility permission granted" : "Accessibility permission needed", systemImage: isTrusted ? "checkmark.shield" : "exclamationmark.shield")
-            HStack {
-                Button("Request Accessibility") {
-                    let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-                    _ = AXIsProcessTrustedWithOptions(options)
-                    isTrusted = AXIsProcessTrusted()
+
+            Text("Devices on this network").font(.headline)
+            if model.devices.isEmpty {
+                Text("Searching…").foregroundStyle(.secondary)
+            }
+            ForEach(model.devices) { device in
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(device.name).font(.body.weight(.medium))
+                        Text(model.sideLabel(for: device)).font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if model.connectedDevice == device.id {
+                        Button("Disconnect") { model.disconnect() }
+                    } else {
+                        Button("Connect") { model.connect(device) }
+                            .disabled(model.connectedDevice != nil)
+                    }
+                    Menu("Position") {
+                        ForEach(AppModel.Side.allCases) { side in
+                            Button("Place \(side.label)") { model.place(device, side: side) }
+                        }
+                        Button("Not placed") { model.place(device, side: nil) }
+                    }
+                    .fixedSize()
                 }
-                Button("Request Input Monitoring") { _ = CGRequestListenEventAccess() }
-                Button("Refresh permissions") { isTrusted = AXIsProcessTrusted() }
+                .padding(.vertical, 2)
+            }
+
+            Divider()
+
+            if model.connectedDevice != nil {
+                HStack {
+                    Button(model.sharing ? "Stop sharing" : "Share mouse & keyboard") {
+                        model.sharing ? model.stopSharing() : model.share()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    if !model.sharing {
+                        Text("Everything you type is also sent to the other Mac until you stop.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            if !model.errorText.isEmpty {
+                Text(model.errorText).font(.caption).foregroundStyle(.red).textSelection(.enabled)
+            }
+
+            Spacer(minLength: 0)
+            HStack {
+                Text(AXIsProcessTrusted() ? "Accessibility: allowed" : "Accessibility: needed to type on this Mac")
+                    .font(.caption)
+                Spacer()
+                Button("Permissions…") { openPrivacySettings() }
+                    .controlSize(.small)
             }
         }
         .padding(20)
-        .confirmationDialog("Share all keyboard and mouse activity with the connected Windows computer?", isPresented: $showConsent) {
-            Button("Start sharing") {
-                do { try controller.startSharing(shareClipboard: shareClipboard); errorMessage = "" }
-                catch { errorMessage = "Cannot start capture: \(error.localizedDescription)" }
-            }
-            Button("Cancel", role: .cancel) { }
+        .alert("Allow this device to control this Mac?",
+               isPresented: Binding(get: { model.pendingRequest != nil },
+                                    set: { if !$0 { model.answerRequest(false) } })) {
+            Button("Allow") { model.answerRequest(true) }
+            Button("Deny", role: .cancel) { model.answerRequest(false) }
         } message: {
-            Text("Local input will also remain active. Do not type passwords while sharing. You can stop using the Stop sharing button.")
-        }
-        .onDisappear { password = "" }
-        .onChange(of: controller.connected) { connected in
-            if !connected { shareClipboard = false }
+            Text("Only accept if you just started a connection from your own device.")
         }
     }
 
-    private func chooseCertificate() {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = false
-        panel.allowsMultipleSelection = false
-        if panel.runModal() == .OK { certificateURL = panel.url }
-    }
-
-    private func connect() {
-        guard let certificateURL, let number = UInt16(port), number > 0, !host.isEmpty else {
-            errorMessage = "Provide a host, valid port and PKCS#12 identity."
-            return
-        }
-        do {
-            let data = try Data(contentsOf: certificateURL, options: [.mappedIfSafe])
-            try controller.connect(host: host, port: number, certificate: data, password: password, peerFingerprint: fingerprint)
-            password = ""
-            errorMessage = ""
-        } catch {
-            password = ""
-            errorMessage = "Connection setup failed: \(error.localizedDescription)"
+    private func openPrivacySettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            NSWorkspace.shared.open(url)
         }
     }
 }
