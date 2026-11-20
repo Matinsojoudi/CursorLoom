@@ -97,4 +97,8 @@ Reject(() => tracker.Complete(ReleaseAcknowledgement.Response(releaseId, false))
 _ = tracker.Begin(releaseId);
 tracker.Complete(ReleaseAcknowledgement.Response(releaseId.ToUpperInvariant(), true));
 Assert(tracker.PendingId is null, "Successful acknowledgement must clear pending state");
+var supported = new ProtocolCapabilities(true);
+var unsupported = new ProtocolCapabilities(false);
+Assert(ProtocolCapabilities.Parse(MessageCodec.Decode(MessageCodec.Encode(supported.Envelope()))) == supported, "Capabilities mismatch");
+Assert(supported.SupportsReleaseWith(supported) && !supported.SupportsReleaseWith(unsupported), "Capability negotiation mismatch");
 Console.WriteLine("Protocol and session checks passed.");
