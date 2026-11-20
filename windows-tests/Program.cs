@@ -69,4 +69,8 @@ Assert(layout.Neighbor("local", DeviceLayout.Direction.Right) == "windows", "Lay
 Assert(layout.Neighbor("windows", DeviceLayout.Direction.Up) == "mac", "Layout up mismatch");
 layout.Remove("windows");
 Assert(layout.Neighbor("local", DeviceLayout.Direction.Right) is null, "Removed device still routed");
+var wheel = new WheelAccumulator();
+Assert(wheel.Push(40) == 0 && wheel.Push(40) == 0 && wheel.Push(40) == 1, "Fine wheel delta lost");
+Assert(wheel.Push(-60) == 0 && wheel.Push(-60) == -1, "Negative wheel delta lost");
+wheel.Push(60); wheel.Reset(); Assert(wheel.Push(60) == 0, "Wheel reset failed");
 Console.WriteLine("Protocol and session checks passed.");

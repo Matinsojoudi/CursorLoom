@@ -19,6 +19,8 @@ internal sealed class WindowsInputCapture : IDisposable
     private readonly HookProc mouseCallback;
     private nint keyboardHook, mouseHook;
     private bool disposed;
+    private readonly WheelAccumulator verticalWheel = new();
+    private readonly WheelAccumulator horizontalWheel = new();
 
     public WindowsInputCapture(Action<RemoteInput> handler)
     {
@@ -81,12 +83,28 @@ internal sealed class WindowsInputCapture : IDisposable
                     case 0x0202: handler(new ButtonInput(0, false)); break;
                     case 0x0204: handler(new ButtonInput(1, true)); break;
                     case 0x0205: handler(new ButtonInput(1, false)); break;
-                    case 0x020A: handler(new ScrollInput(unchecked((short)(data.Mouse >> 16)) / 120, 0)); break;
-                    case 0x020E: handler(new ScrollInput(0, unchecked((short)(data.Mouse >> 16)) / 120)); break;
+                    case 0x020A:
+                        int vertical = verticalWheel.Push(unchecked((short)(data.Mouse >> 16)));
+                        if (vertical != 0) EmitScroll(vertical, horizontal: false);
+                        break;
+                    case 0x020E:
+                        int horizontal = horizontalWheel.Push(unchecked((short)(data.Mouse >> 16)));
+                        if (horizontal != 0) EmitScroll(horizontal, horizontal: true);
+                        break;
                 }
             }
         }
         return CallNextHookEx(mouseHook, code, message, pointer);
+    }
+
+    private void EmitScroll(int value, bool horizontal)
+    {
+        while (value != 0)
+        {
+            int chunk = Math.Clamp(value, -100, 100);
+            handler(horizontal ? new ScrollInput(0, chunk) : new ScrollInput(chunk, 0));
+            value -= chunk;
+        }
     }
 
     public void Dispose()
