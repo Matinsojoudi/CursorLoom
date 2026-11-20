@@ -100,7 +100,7 @@ public final class DeviceIdentity {
         self.fingerprint = fingerprint
     }
 
-    public static func loadOrCreate(storage: IdentityStorage = KeychainIdentityStorage(),
+    public static func loadOrCreate(storage: IdentityStorage = DeviceIdentity.defaultStorage(),
                                     name: String = DeviceIdentity.defaultName()) throws -> DeviceIdentity {
         if let data = try storage.load(), let stored = try? JSONDecoder().decode(Blob.self, from: data),
            let restored = try? restore(stored) {
@@ -143,6 +143,15 @@ public final class DeviceIdentity {
             throw IdentityError.creationFailed
         }
         return data
+    }
+
+    /// Alpha builds are re-signed on every install, which invalidates keychain ACLs
+    /// for an ad-hoc signature. The key therefore lives in a 0600 file inside the app's
+    /// Application Support directory. This is weaker than the keychain and must be
+    /// replaced once the app is signed with a stable identity.
+    public static func defaultStorage() -> IdentityStorage {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        return FileIdentityStorage(url: base.appendingPathComponent("CursorLoom/identity.json"))
     }
 
     public static func defaultName() -> String {

@@ -133,7 +133,7 @@ public final class PeerDiscovery {
             var length = socklen_t(MemoryLayout<sockaddr_in>.size)
             let received = withUnsafeMutablePointer(to: &sender) {
                 $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-                    recvfrom(socketFD, &buffer, buffer.count, 0, $0, &length)
+                    recvfrom(socketFD, &buffer, buffer.count, MSG_DONTWAIT, $0, &length)
                 }
             }
             guard received > 0 else { return }
