@@ -50,7 +50,9 @@ public enum SecureTransport {
     public static func listener(port: UInt16, fingerprint: Data, identity: SecIdentity,
                                 callbackQueue: DispatchQueue) throws -> NWListener {
         guard fingerprint.count == 32 else { throw ConfigurationError.invalidFingerprint }
-        guard let endpointPort = NWEndpoint.Port(rawValue: port) else { throw ConfigurationError.invalidPort }
+        let endpointPort: NWEndpoint.Port
+        if port == 0 { endpointPort = .any }
+        else { guard let parsed = NWEndpoint.Port(rawValue: port) else { throw ConfigurationError.invalidPort }; endpointPort = parsed }
         let tls = NWProtocolTLS.Options()
         guard let localIdentity = sec_identity_create(identity) else { throw ConfigurationError.invalidIdentity }
         sec_protocol_options_set_local_identity(tls.securityProtocolOptions, localIdentity)
